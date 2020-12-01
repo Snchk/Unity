@@ -11,6 +11,7 @@ public class ProjectileController : MonoBehaviour
         EnemiesController enemy = info.GetComponent<EnemiesController>();
         if (enemy != null)
             enemy.TakeDamage(_damage);
-       
+
+        Destroy(gameObject);
     }
 }

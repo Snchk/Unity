@@ -25,7 +25,7 @@ public class PC_InputController : MonoBehaviour
     
     // Update is called once per frame
         _move = Input.GetAxisRaw("Horizontal");
-        if (Input.GetButtonDown("Jump"))
+        if (Input.GetKeyDown(KeyCode.Space))
         {
             _jump = true;
         }

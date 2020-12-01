@@ -2,6 +2,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using Random = UnityEngine.Random;
@@ -30,7 +31,7 @@ public abstract class EnemyControllerBase : MonoBehaviour
 
     [Header("Movement")]
     [SerializeField] private float _speed;
-    [SerializeField] private float _range;
+    [SerializeField] protected float _range;
     [SerializeField] private Transform _groundCheck;
     [SerializeField] private LayerMask _whatIsGround;
     protected Vector2 _startPoint;
@@ -40,6 +41,7 @@ public abstract class EnemyControllerBase : MonoBehaviour
     [SerializeField] private DamageType _collisionDamageType;
     [SerializeField] protected int _collisionDamage;
     [SerializeField] protected float _collisionTimeDelay;
+    [SerializeField] protected bool _triggerDamageMode;
     private float _lastDamageTime;
 
     #region UnityMethods
@@ -60,13 +62,16 @@ public abstract class EnemyControllerBase : MonoBehaviour
 
         if (IsGroundEnding())
             Flip();
-
-        if (_currentState == EnemyState.Move)
+        else if (_currentState == EnemyState.Move)
             Move();
     }
 
     protected virtual void Update()
     {
+
+        if (IsGroundEnding())
+            Flip();
+
         if (_currentState == EnemyState.Death)
             return;
 
@@ -76,9 +81,31 @@ public abstract class EnemyControllerBase : MonoBehaviour
 
     protected virtual void OnCollisionEnter2D(Collision2D collision)
     {
-        if (_currentState == EnemyState.Death)
+        if (_triggerDamageMode || _currentState == EnemyState.Death)
             return;
+
         TryToDamage(collision.collider);
+    }
+
+    protected virtual void OnCollisionStay2D(Collision2D collision)
+    {
+        if (_triggerDamageMode || _currentState == EnemyState.Death)
+            return;
+
+        TryToDamage(collision.collider);
+    }
+
+    protected virtual void OnCollisionExit2D(Collision2D collision)
+    {
+        GetComponent<Animator>().Play("Idle");
+    }
+
+    protected virtual void OnTriggerEnter2D(Collider2D info)
+    {
+        if (!_triggerDamageMode || _currentState == EnemyState.Death)
+            return;
+
+        TryToDamage(info);
     }
 
     protected virtual void OnDrawGizmos()
@@ -92,6 +119,8 @@ public abstract class EnemyControllerBase : MonoBehaviour
     {
         if (_currentState == EnemyState.Death)
             return;
+
+        Debug.Log(transform.position + new Vector3(0f, 1.25f));
 
         _currentHp -= damage;
         Debug.Log(String.Format("Enemy {0} take damage {1} and his currentHp = {2}", gameObject, damage, _currentHp));
@@ -175,10 +204,30 @@ public abstract class EnemyControllerBase : MonoBehaviour
 
     protected virtual void TryToDamage(Collider2D enemy)
     {
+        if (enemy == null)
+            return;
+
         if ((Time.time - _lastDamageTime) < _collisionTimeDelay)
             return;
 
         Player_controller player = enemy.GetComponent<Player_controller>();
+        if (player != null && !player.IsDead)
+        {
+            GetComponent<Animator>().Play("Attack");
+            player.TakeTamage(_collisionDamage, _collisionDamageType, transform);
+            _lastDamageTime = Time.time;
+        }
+    }
+
+    protected virtual void TryToDamage(Collision2D enemy)
+    {
+        if (enemy == null)
+            return;
+
+        if ((Time.time - _lastDamageTime) < _collisionTimeDelay)
+            return;
+
+        Player_controller player = enemy.gameObject.GetComponent<Player_controller>();
         if (player != null)
         {
             player.TakeTamage(_collisionDamage, _collisionDamageType, transform);
@@ -190,6 +239,7 @@ public abstract class EnemyControllerBase : MonoBehaviour
     {
         if (_currentState == EnemyState.Death)
             return;
+
         _enemyRb.velocity = transform.right * new Vector2(_speed, _enemyRb.velocity.y);
     }
 
@@ -197,8 +247,10 @@ public abstract class EnemyControllerBase : MonoBehaviour
     {
         if (_currentState == EnemyState.Death)
             return;
-        _faceRight = !_faceRight;
+
+        //_faceRight = !_faceRight;
         transform.Rotate(0, 180, 0);
+        _hpSlider.transform.parent.Rotate(0, 180, 0);
         //_canvas.transform.Rotate(0, 180, 0);
     }
 

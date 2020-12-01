@@ -8,7 +8,7 @@ using System;
 [RequireComponent(typeof(Player_controller))]
 public class Movement_controller : MonoBehaviour
 {
-    public event Action<bool> OnGetHurt = delegate{};
+    public event Action<bool> OnGetHurt = delegate { };
     private Animator _playerAnimator;
     private Rigidbody2D _playerRB;
     private Player_controller _playerController;
@@ -17,6 +17,7 @@ public class Movement_controller : MonoBehaviour
     [Range(0, 1)]
     private bool _faceRight = true;
     private bool _canMove = true;
+    public bool IsFaceRight => _faceRight;
 
     [Header("Jumping")]
     [SerializeField] private bool _airControll;
@@ -30,7 +31,7 @@ public class Movement_controller : MonoBehaviour
     [SerializeField] private Transform _cellCheck;
     [SerializeField] private Collider2D _headCollider;
     private bool _canStand;
-    
+
     [Header("Casting")]
     [SerializeField] private GameObject _fireBall;
     [SerializeField] private Transform _firePoint;
@@ -56,6 +57,11 @@ public class Movement_controller : MonoBehaviour
     [SerializeField] private float _pushForce;
     private float _lastHurtTime;
 
+    public void DisableMove()
+    {
+        _canMove = false;
+    }
+
     private void OnCollisionEnter2D(Collision2D collision)
     {
         EnemiesController enemy = collision.collider.GetComponent<EnemiesController>();
@@ -63,7 +69,7 @@ public class Movement_controller : MonoBehaviour
         {
             return;
         }
-       
+
         if (enemy == null || _damagedEnemies.Contains(enemy))
             return;
 
@@ -78,11 +84,11 @@ public class Movement_controller : MonoBehaviour
         _playerController = GetComponent<Player_controller>();
     }
 
-   
-    
 
-        private void OnDrawGizmos()
-        {
+
+
+    private void OnDrawGizmos()
+    {
         Gizmos.DrawWireSphere(_groundCheck.position, _radius);
         Gizmos.color = Color.red;
         Gizmos.DrawWireSphere(_cellCheck.position, _radius);
@@ -92,7 +98,7 @@ public class Movement_controller : MonoBehaviour
     void Flip()
     {
         _faceRight = !_faceRight;
-        transform.Rotate(0, 180, 0); 
+        transform.Rotate(0, 180, 0);
     }
 
     private void FixedUpdate()
@@ -103,14 +109,16 @@ public class Movement_controller : MonoBehaviour
             EndHurt();
     }
 
-    public void Move(float move,bool jump,bool crawling)
+    public void Move(float move, bool jump, bool crawling)
     {
         #region Movement
 
         if (!_canMove)
         {
+            _playerAnimator.SetFloat("Speed", Mathf.Abs(move));
             return;
         }
+
         if (move != 0 && (_grounded || _airControll))
         {
             _playerRB.velocity = new Vector2(_speed * move, _playerRB.velocity.y);
@@ -163,6 +171,9 @@ public class Movement_controller : MonoBehaviour
     }
     public void StartCasting()
     {
+        if (!_canMove)
+            return;
+
         if (_isCasting || !_playerController.ChangeMP(-_castCost))
             return;
         _isCasting = true;
@@ -171,6 +182,9 @@ public class Movement_controller : MonoBehaviour
 
     private void CastFire()
     {
+        if (!_canMove)
+            return;
+
         GameObject fireBall = Instantiate(_fireBall, _firePoint.position, Quaternion.identity);
         fireBall.GetComponent<Rigidbody2D>().velocity = transform.right * _fireBallSpeed;
         fireBall.GetComponent<SpriteRenderer>().flipX = !_faceRight;
@@ -183,8 +197,11 @@ public class Movement_controller : MonoBehaviour
         _playerAnimator.SetBool("Casting", false);
     }
 
-    public void StartStrike(float holdTime) 
+    public void StartStrike(float holdTime)
     {
+        if (!_canMove)
+            return;
+
         if (_isStriking || _playerRB.velocity != Vector2.zero)
             return;
 
@@ -193,16 +210,16 @@ public class Movement_controller : MonoBehaviour
         {
             if (!_playerController.ChangeMP(-_powerStrikeCost))
                 return;
-            
+
             _playerAnimator.SetBool("PowerStrike", true);
-            
+
         }
         else
         {
             _playerAnimator.SetBool("Striking", true);
         }
         _isStriking = true;
-       
+
     }
     public void GetHurt(Vector2 position)
     {
@@ -222,6 +239,7 @@ public class Movement_controller : MonoBehaviour
         _playerAnimator.SetBool("PowerStrike", false);
         _playerAnimator.SetBool("Casting", false);
         _playerAnimator.SetBool("Hurt", false);
+        _playerAnimator.SetBool("Block", false);
         _isCasting = false;
         _isStriking = false;
         _canMove = true;
@@ -235,15 +253,19 @@ public class Movement_controller : MonoBehaviour
 
     private void StartPowerStrike()
     {
+        //if (!_canMove)
+        //    return;
+
         _playerRB.velocity = transform.right * _powerStrikeSpeed;
         _strikeCollider.enabled = true;
+        _canMove = false;
     }
 
     private void DisablePowerStrike()
     {
         _playerRB.velocity = Vector2.zero;
-        _strikeCollider.enabled = false;
         _damagedEnemies.Clear();
+        _canMove = true;
     }
 
     private void EndPowerStrike()
@@ -251,6 +273,7 @@ public class Movement_controller : MonoBehaviour
         _playerAnimator.SetBool("PowerStrike", false);
         _canMove = true;
         _isStriking = false;
+        _strikeCollider.enabled = false;
     }
 
     private void Strike()
@@ -271,5 +294,16 @@ public class Movement_controller : MonoBehaviour
         _canMove = true;
     }
 
- 
+    public void AddJumpBoost(int value)
+    {
+        StartCoroutine(StartJumpBoost(value));
+    }
+
+    private IEnumerator StartJumpBoost(int value)
+    {
+        float temp = _jumpForce;
+        _jumpForce = value;
+        yield return new WaitForSeconds(10f);
+        _jumpForce = temp;
+    }
 }
